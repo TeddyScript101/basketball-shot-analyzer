@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "npx shadcn@latest add button card input label badge separator skeleton tabs tooltip --yes --overwrite 2>/dev/null || true"
+    "setup:ui": "npx shadcn@latest init && npx shadcn@latest add button card input label badge separator skeleton tabs tooltip"
   },
   "dependencies": {
     "next": "15.1.0",
