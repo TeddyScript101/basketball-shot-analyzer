@@ -1,3 +1,4 @@
+import os
 import time
 import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,7 @@ from ..models.video import Video, VideoStatus
 from ..models.analysis import Analysis, Metric, Recommendation
 from ..cv.pose_analyzer import PoseAnalyzer
 from ..cv.recommendations import generate_recommendations
+from ..core.config import settings
 
 
 METRIC_DEFINITIONS = [
@@ -94,6 +96,15 @@ async def run_analysis(video_id: int, db: AsyncSession) -> None:
         analysis.shooting_arm = shooting_metrics.shooting_arm
         analysis.frames_analyzed = shooting_metrics.frames_analyzed
         analysis.processing_time_seconds = round(time.monotonic() - t_start, 2)
+
+        # Generate pose visualization image
+        pose_image_path = os.path.join(
+            settings.UPLOAD_DIR, f"analysis_{analysis.id}_pose.jpg"
+        )
+        with PoseAnalyzer() as viz_analyzer:
+            saved = viz_analyzer.generate_pose_image(shooting_metrics, pose_image_path)
+        if saved:
+            analysis.pose_image_path = pose_image_path
 
         for defn in METRIC_DEFINITIONS:
             value = getattr(shooting_metrics, defn["attr"], None)

@@ -18,6 +18,7 @@ class Analysis(Base):
     frames_analyzed: Mapped[int | None] = mapped_column(Integer)
     processing_time_seconds: Mapped[float | None] = mapped_column(Float)
     error_message: Mapped[str | None] = mapped_column(Text)
+    pose_image_path: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

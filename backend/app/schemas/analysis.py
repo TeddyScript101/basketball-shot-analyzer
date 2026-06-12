@@ -30,6 +30,7 @@ class AnalysisResponse(BaseModel):
     shooting_arm: Optional[str]
     frames_analyzed: Optional[int]
     processing_time_seconds: Optional[float]
+    pose_image_url: Optional[str] = None
     created_at: datetime
     metrics: list[MetricResponse]
     recommendations: list[RecommendationResponse]

@@ -89,6 +89,22 @@ export default function AnalysisPage() {
         </div>
       </div>
 
+      {analysis.pose_image_url && (
+        <div className="bg-card border border-border rounded-xl p-6 space-y-3">
+          <div>
+            <h3 className="font-semibold">Pose Visualization</h3>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              MediaPipe skeleton overlay at detected release frame
+            </p>
+          </div>
+          <img
+            src={analysis.pose_image_url}
+            alt="Pose skeleton at release frame"
+            className="w-full rounded-lg object-contain bg-black max-h-[480px]"
+          />
+        </div>
+      )}
+
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
           Metrics Detail

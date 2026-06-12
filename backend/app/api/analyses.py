@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+import os
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from ..db.session import get_db
 from ..core.dependencies import get_current_user
+from ..core.config import settings
 from ..models.user import User
 from ..models.video import Video
 from ..models.analysis import Analysis
@@ -42,6 +44,7 @@ async def list_analyses(
 @router.get("/{analysis_id}", response_model=AnalysisResponse)
 async def get_analysis(
     analysis_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -58,4 +61,10 @@ async def get_analysis(
     analysis = result.scalar_one_or_none()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
-    return analysis
+
+    response = AnalysisResponse.model_validate(analysis)
+    if analysis.pose_image_path and os.path.exists(analysis.pose_image_path):
+        filename = os.path.basename(analysis.pose_image_path)
+        base = str(request.base_url).rstrip("/")
+        response.pose_image_url = f"{base}/uploads/{filename}"
+    return response

@@ -52,6 +52,7 @@ export interface Analysis {
   shooting_arm: string | null;
   frames_analyzed: number | null;
   processing_time_seconds: number | null;
+  pose_image_url: string | null;
   created_at: string;
   metrics: Metric[];
   recommendations: Recommendation[];
