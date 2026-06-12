@@ -51,10 +51,14 @@ export function VideoPreviewPlayer({ src, currentTime, onDurationLoaded }: Props
     if (!video) return;
     if (isPlaying) {
       video.pause();
+      setIsPlaying(false);
     } else {
-      video.play();
+      video.play().catch((err) => {
+        if (err.name !== "AbortError") console.error(err);
+        setIsPlaying(false);
+      });
+      setIsPlaying(true);
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
