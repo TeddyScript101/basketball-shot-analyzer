@@ -59,10 +59,10 @@ export function VideoPreviewPlayer({ src, currentTime, onDurationLoaded }: Props
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !isFinite(video.duration) || video.duration === 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
-    video.currentTime = pct * video.duration;
+    video.currentTime = Math.max(0, Math.min(video.duration, pct * video.duration));
   };
 
   return (
@@ -71,6 +71,7 @@ export function VideoPreviewPlayer({ src, currentTime, onDurationLoaded }: Props
         ref={videoRef}
         src={src}
         className="w-full aspect-video object-contain bg-black"
+        preload="metadata"
         playsInline
       />
       <div className="bg-card border-x border-b border-border p-3 space-y-2">
