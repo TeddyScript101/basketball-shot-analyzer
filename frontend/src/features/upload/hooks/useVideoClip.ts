@@ -84,7 +84,8 @@ export function useVideoClip() {
 
     try {
       const ffmpeg = await getFFmpeg();
-      const inputName = "input" + clip.file.name.match(/\.[^.]+$/)?.[0] ?? ".mp4";
+      const ext = clip.file.name.match(/\.[^.]+$/)?.[0] ?? ".mp4";
+      const inputName = "input" + ext;
       await ffmpeg.writeFile(inputName, await fetchFile(clip.file));
 
       await ffmpeg.exec([
