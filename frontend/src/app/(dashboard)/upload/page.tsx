@@ -13,7 +13,7 @@ type Stage = "idle" | "selected" | "trimming" | "uploading" | "done" | "error";
 
 export default function UploadPage() {
   const router = useRouter();
-  const { clip, isTrimming, trimProgress, trimError, loadFile, updateRange, trimClip, reset } =
+  const { clip, isTrimming, trimProgress, trimError, loadFile, setDuration, updateRange, trimClip, reset } =
     useVideoClip();
   const [stage, setStage] = useState<Stage>("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -27,7 +27,7 @@ export default function UploadPage() {
       const file = e.dataTransfer.files[0];
       if (file && file.type.startsWith("video/")) {
         setStage("selected");
-        loadFile(file, 0);
+        loadFile(file);
       }
     },
     [loadFile]
@@ -38,7 +38,7 @@ export default function UploadPage() {
       const file = e.target.files?.[0];
       if (file) {
         setStage("selected");
-        loadFile(file, 0);
+        loadFile(file);
       }
     },
     [loadFile]
@@ -46,9 +46,9 @@ export default function UploadPage() {
 
   const handleDurationLoaded = useCallback(
     (duration: number) => {
-      if (clip.file) loadFile(clip.file, duration);
+      setDuration(duration);
     },
-    [clip.file, loadFile]
+    [setDuration]
   );
 
   const handleSubmit = async () => {

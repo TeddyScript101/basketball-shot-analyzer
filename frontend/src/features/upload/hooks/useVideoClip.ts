@@ -31,19 +31,33 @@ export function useVideoClip() {
   const [trimError, setTrimError] = useState<string | null>(null);
   const ffmpegRef = useRef<FFmpeg | null>(null);
 
-  const loadFile = useCallback((file: File, videoDuration: number) => {
-    const objectUrl = URL.createObjectURL(file);
-    const end = Math.min(videoDuration, MAX_DURATION);
-    setClip({
-      file,
-      objectUrl,
-      duration: videoDuration,
-      startTime: 0,
-      endTime: end,
-      clipDuration: end,
-      isValid: end <= MAX_DURATION,
+  // Call once when file is picked. Creates the objectUrl.
+  const loadFile = useCallback((file: File) => {
+    setClip((prev) => {
+      if (prev.objectUrl) URL.revokeObjectURL(prev.objectUrl);
+      return {
+        file,
+        objectUrl: URL.createObjectURL(file),
+        duration: 0,
+        startTime: 0,
+        endTime: 0,
+        clipDuration: 0,
+        isValid: false,
+      };
     });
     setTrimError(null);
+  }, []);
+
+  // Call once video metadata loads with the real duration. Never recreates objectUrl.
+  const setDuration = useCallback((duration: number) => {
+    const end = Math.min(duration, MAX_DURATION);
+    setClip((prev) => ({
+      ...prev,
+      duration,
+      endTime: end,
+      clipDuration: end,
+      isValid: end > 0 && end <= MAX_DURATION,
+    }));
   }, []);
 
   const updateRange = useCallback((start: number, end: number) => {
@@ -130,6 +144,7 @@ export function useVideoClip() {
     trimProgress,
     trimError,
     loadFile,
+    setDuration,
     updateRange,
     trimClip,
     reset,
