@@ -100,7 +100,7 @@ export function useVideoClip() {
       ]);
 
       const data = await ffmpeg.readFile("output.mp4");
-      return new Blob([data], { type: "video/mp4" });
+      return new Blob([new Uint8Array(data as Uint8Array)], { type: "video/mp4" });
     } catch (err) {
       setTrimError(err instanceof Error ? err.message : "Trim failed");
       return null;
