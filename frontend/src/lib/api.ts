@@ -26,7 +26,11 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
-    if (error.response?.status === 401 && typeof window !== "undefined") {
+    if (
+      error.response?.status === 401 &&
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/login")
+    ) {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       window.location.href = "/login";

@@ -4,11 +4,14 @@ import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from ..db.session import AsyncSessionLocal
 from ..models.video import Video, VideoStatus
 from ..models.analysis import Analysis, Metric, Recommendation
 from ..cv.pose_analyzer import PoseAnalyzer
 from ..cv.recommendations import generate_recommendations
 from ..core.config import settings
+
+_analysis_semaphore = asyncio.Semaphore(2)
 
 
 METRIC_DEFINITIONS = [
@@ -24,15 +27,15 @@ METRIC_DEFINITIONS = [
         "key": "elbow_angle",
         "name": "Elbow Angle at Release",
         "unit": "degrees",
-        "ideal_min": 85.0,
-        "ideal_max": 100.0,
+        "ideal_min": 155.0,
+        "ideal_max": 175.0,
         "attr": "elbow_angle_at_release",
     },
     {
         "key": "knee_angle",
         "name": "Knee Bend at Setup",
         "unit": "degrees",
-        "ideal_min": 90.0,
+        "ideal_min": 70.0,
         "ideal_max": 120.0,
         "attr": "knee_angle_at_setup",
     },
@@ -56,13 +59,13 @@ METRIC_DEFINITIONS = [
         "key": "jump_height",
         "name": "Jump Height Estimate",
         "unit": "normalized",
-        "ideal_min": 0.03,
-        "ideal_max": 0.12,
+        "ideal_min": 0.02,
+        "ideal_max": 0.18,
         "attr": "jump_height_estimate",
     },
     {
         "key": "release_consistency",
-        "name": "Release Consistency",
+        "name": "Motion Smoothness",
         "unit": "score",
         "ideal_min": 75.0,
         "ideal_max": 100.0,
@@ -71,8 +74,13 @@ METRIC_DEFINITIONS = [
 ]
 
 
-async def run_analysis(video_id: int, db: AsyncSession) -> None:
+async def run_analysis(video_id: int) -> None:
     """Background task: run CV analysis and persist results."""
+    async with AsyncSessionLocal() as db:
+        await _run_analysis_in_session(video_id, db)
+
+
+async def _run_analysis_in_session(video_id: int, db: AsyncSession) -> None:
     result = await db.execute(select(Video).where(Video.id == video_id))
     video = result.scalar_one_or_none()
     if not video:
@@ -88,23 +96,27 @@ async def run_analysis(video_id: int, db: AsyncSession) -> None:
     t_start = time.monotonic()
     try:
         loop = asyncio.get_event_loop()
-        shooting_metrics = await loop.run_in_executor(
-            None, _run_cv_analysis, video.file_path
-        )
+        async with _analysis_semaphore:
+            shooting_metrics = await loop.run_in_executor(
+                None, _run_cv_analysis, video.file_path
+            )
 
         analysis.score = shooting_metrics.overall_score
         analysis.shooting_arm = shooting_metrics.shooting_arm
         analysis.frames_analyzed = shooting_metrics.frames_analyzed
         analysis.processing_time_seconds = round(time.monotonic() - t_start, 2)
 
-        # Generate pose visualization image
-        pose_image_path = os.path.join(
-            settings.UPLOAD_DIR, f"analysis_{analysis.id}_pose.jpg"
-        )
-        with PoseAnalyzer() as viz_analyzer:
-            saved = viz_analyzer.generate_pose_image(shooting_metrics, pose_image_path)
-        if saved:
-            analysis.pose_image_path = pose_image_path
+        # Generate pose visualization image (non-fatal)
+        try:
+            pose_image_path = os.path.join(
+                settings.UPLOAD_DIR, f"analysis_{analysis.id}_pose.jpg"
+            )
+            with PoseAnalyzer() as viz_analyzer:
+                saved = viz_analyzer.generate_pose_image(shooting_metrics, pose_image_path)
+            if saved:
+                analysis.pose_image_path = pose_image_path
+        except Exception as pose_exc:
+            print(f"[WARN] pose image generation failed (non-fatal): {pose_exc}")
 
         for defn in METRIC_DEFINITIONS:
             value = getattr(shooting_metrics, defn["attr"], None)

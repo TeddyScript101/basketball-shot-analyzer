@@ -30,7 +30,7 @@ services:
       SECRET_KEY: dev-secret-key-change-in-production-use-32-chars
       UPLOAD_DIR: /app/uploads
       CORS_ORIGINS: http://localhost:3000
-      DEBUG: "true"
+      DEBUG: "false"
     volumes:
       - ./backend:/app
       - uploads_data:/app/uploads

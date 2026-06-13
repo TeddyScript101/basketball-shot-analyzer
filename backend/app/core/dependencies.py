@@ -30,7 +30,11 @@ async def get_current_user(
     except JWTError:
         raise exc
 
-    result = await db.execute(select(User).where(User.id == int(user_id)))
+    try:
+        uid = int(user_id)
+    except (ValueError, TypeError):
+        raise exc
+    result = await db.execute(select(User).where(User.id == uid))
     user = result.scalar_one_or_none()
     if not user:
         raise exc

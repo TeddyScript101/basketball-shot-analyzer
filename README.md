@@ -1,8 +1,8 @@
 # ShotIQ — Basketball Shot Analyzer
 
-A production-grade full-stack computer vision SaaS platform for analyzing basketball shooting mechanics and tracking training progress over time.
+A full-stack computer vision SaaS platform for analyzing basketball shooting mechanics. Upload a short clip, get biomechanical metrics, pose visualization, and coaching feedback instantly.
 
-## Architecture Overview
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -10,7 +10,7 @@ A production-grade full-stack computer vision SaaS platform for analyzing basket
 │  Next.js 15 + TypeScript + Tailwind + Recharts             │
 │  FFmpeg.wasm (in-browser video trimming)                    │
 └───────────────────────┬─────────────────────────────────────┘
-                        │ HTTPS REST
+                        │ REST API
 ┌───────────────────────▼─────────────────────────────────────┐
 │                    FastAPI Backend                           │
 │  JWT Auth · Video Upload · Background CV Analysis          │
@@ -27,25 +27,25 @@ A production-grade full-stack computer vision SaaS platform for analyzing basket
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui |
-| State | Zustand, TanStack Query v5 |
-| Charts | Recharts |
-| Video | HTML5 Video API, FFmpeg.wasm |
-| Backend | Python 3.12, FastAPI, SQLAlchemy (async), Alembic |
-| Computer Vision | MediaPipe Pose, OpenCV |
+| Frontend | Next.js 15 (App Router), TypeScript, Tailwind CSS |
+| Charts | Recharts (radar chart, line chart) |
+| Video | HTML5 Video API, FFmpeg.wasm (client-side trim) |
+| Backend | Python 3.12, FastAPI, SQLAlchemy (async) |
+| Computer Vision | MediaPipe Pose 0.10, OpenCV |
 | Database | PostgreSQL 16 |
 | Infrastructure | Docker, Docker Compose |
 
 ## Features
 
-- **JWT Authentication** — register, login, protected routes
-- **In-browser video trimming** — FFmpeg.wasm trims clips client-side before upload
-- **15-second clip enforcement** — validated on both frontend and backend
-- **AI pose analysis** — MediaPipe Pose extracts 33 body landmarks per frame
-- **7 biomechanical metrics** — release angle, elbow angle, knee bend, shoulder alignment, shot duration, jump height, release consistency
+- **JWT authentication** — register, login, protected routes
+- **In-browser video trimming** — FFmpeg.wasm trims clips client-side before upload, no raw footage leaves the browser
+- **3-second clip limit** — one shot per analysis, enforced on frontend and backend
+- **4-stage shooting arm detection** — wrist height, wrist snap (壓手腕), follow-through, elbow height fallback
+- **7 biomechanical metrics** — release angle, elbow angle, knee bend, shoulder alignment, shot duration, jump height, motion smoothness
+- **2-panel pose visualization** — Loading and Release frames with skeleton overlay
 - **Automated coaching feedback** — rule-based recommendations with priority levels
-- **Progress dashboard** — score history line chart, mechanics radar chart, session stats
-- **Shot history** — searchable/filterable list of all past analyses
+- **Progress dashboard** — score history, mechanics radar chart, session stats
+- **Shot history** — filterable list of all past analyses
 
 ## Quick Start
 
@@ -53,9 +53,8 @@ A production-grade full-stack computer vision SaaS platform for analyzing basket
 
 - Docker Desktop
 - Node.js 22+
-- Python 3.12+ (for local dev without Docker)
 
-### With Docker (recommended)
+### Run with Docker
 
 ```bash
 git clone <repo>
@@ -63,7 +62,6 @@ cd basketball-shot-analyzer
 docker-compose up --build
 ```
 
-Open:
 - Frontend: http://localhost:3000
 - Backend API docs: http://localhost:8000/docs
 
@@ -75,17 +73,13 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-# Copy env file
 cp .env.example .env
 
-# Start PostgreSQL (Docker only for DB)
+# Start DB only
 docker-compose up db -d
 
-# Run migrations
+# Run migrations and start server
 alembic upgrade head
-
-# Start server
 uvicorn app.main:app --reload
 ```
 
@@ -103,11 +97,11 @@ npm run dev
 
 | Variable | Default | Description |
 |---|---|---|
-| `DATABASE_URL` | `postgresql+asyncpg://...` | PostgreSQL async connection URL |
-| `SECRET_KEY` | — | JWT signing key (change in production) |
-| `UPLOAD_DIR` | `./uploads` | Directory for uploaded videos |
+| `DATABASE_URL` | `postgresql+asyncpg://...` | PostgreSQL async connection string |
+| `SECRET_KEY` | — | JWT signing key |
+| `UPLOAD_DIR` | `./uploads` | Uploaded video storage path |
 | `CORS_ORIGINS` | `http://localhost:3000` | Allowed frontend origins |
-| `MAX_VIDEO_DURATION` | `15` | Maximum clip duration in seconds |
+| `MAX_VIDEO_DURATION` | `3` | Max clip duration in seconds |
 
 ### Frontend (`.env.local`)
 
@@ -119,16 +113,15 @@ npm run dev
 
 ```
 POST   /api/auth/register      Register new user
-POST   /api/auth/login         Login, receive JWT tokens
+POST   /api/auth/login         Login, receive JWT
 
-GET    /api/users/me           Get current user profile
+GET    /api/users/me           Current user profile
 
-POST   /api/videos/upload      Upload trimmed video (triggers analysis)
+POST   /api/videos/upload      Upload clip (triggers async analysis)
 GET    /api/videos             List user's videos
-GET    /api/videos/{id}        Get video details
 
 GET    /api/analyses           List all analyses
-GET    /api/analyses/{id}      Get full analysis with metrics + recommendations
+GET    /api/analyses/{id}      Full analysis with metrics + recommendations
 
 GET    /api/dashboard          Aggregated stats, history, metric averages
 ```
@@ -139,58 +132,93 @@ GET    /api/dashboard          Aggregated stats, history, metric averages
 Video File
     │
     ▼
-OpenCV Frame Extraction (up to 720px width, 30fps)
+OpenCV Frame Extraction (max 720px width)
     │
     ▼
 MediaPipe Pose (33 landmark keypoints per frame)
     │
     ▼
-Shooting Arm Detection (dominant wrist peak height)
+Shooting Arm Detection (4-stage)
+  1. Top-5 mean wrist height (clear profile shots)
+  2. Wrist snap magnitude around release (壓手腕)
+  3. Post-release follow-through height
+  4. Peak elbow height fallback
     │
     ▼
-Release Frame Detection (wrist height × arm extension score)
+Release Frame Detection
+  Score = (wrist_height × 0.65 + elbow_extension × 0.35) × visibility
     │
     ▼
 Metric Calculation
-  ├─ Release Angle     (forearm vector vs horizontal at release)
-  ├─ Elbow Angle       (shoulder-elbow-wrist at release)
-  ├─ Knee Bend         (hip-knee-ankle minimum in setup phase)
-  ├─ Shoulder Alignment (Y-difference between shoulders)
-  ├─ Shot Duration     (frames from onset to release / fps)
-  ├─ Jump Height       (hip Y displacement, normalized)
-  └─ Consistency       (wrist trajectory smoothness)
+  ├─ Release Angle       forearm vector vs horizontal at release frame
+  ├─ Elbow Angle         shoulder-elbow-wrist angle at release
+  ├─ Knee Bend           hip-knee-ankle angle at loading bottom (start_idx)
+  ├─ Shoulder Alignment  Y-difference between shoulders at release
+  ├─ Shot Duration       frames from wrist dip bottom to release / fps
+  ├─ Jump Height         ankle lift from ground baseline to peak (true departure)
+  └─ Motion Smoothness   wrist trajectory jitter score
     │
     ▼
-Score Computation (weighted 0–100)
+Weighted Score (0-100)
     │
     ▼
-Recommendation Generation (priority 1–3)
+Pose Visualization (2-panel JPEG: Loading + Release)
     │
     ▼
-Persisted to PostgreSQL
+Recommendation Generation (priority 1-3)
+    │
+    ▼
+Persist to PostgreSQL
 ```
+
+## Metrics & Ideal Ranges
+
+| Metric | Ideal Range | Unit | Notes |
+|---|---|---|---|
+| Release Angle | 45-55° | degrees | Forearm vs horizontal |
+| Elbow Angle at Release | 155-175° | degrees | Near full extension |
+| Knee Bend at Setup | 70-120° | degrees | Low weight (2D projection error on profile shots) |
+| Shoulder Alignment | 0-3 | deviation | Y-difference × 100 |
+| Shot Duration | 0.4-0.9 | seconds | Dip bottom to release |
+| Jump Height Estimate | 0.02-0.18 | normalized | Ankle lift, not hip displacement |
+| Motion Smoothness | 75-100 | score | 100 = no jitter |
+
+## Scoring & Grades
+
+Each metric contributes a weighted component score (0-100). Distance from ideal range is penalized linearly.
+
+| Metric | Weight |
+|---|---|
+| Release Angle | 30% |
+| Elbow Angle | 27% |
+| Motion Smoothness | 20% |
+| Shoulder Alignment | 15% |
+| Knee Bend | 8% |
+
+| Grade | Score |
+|---|---|
+| A | 88+ |
+| B | 75-87 |
+| C | 60-74 |
+| D | < 60 |
+
+## Recording Tips
+
+- **Film from 45-90° side angle** — front-on shots hide elbow extension and knee depth
+- **Player should fill at least half the frame height** — MediaPipe accuracy drops significantly with small subjects
+- **Select exactly one shot** — the 3-second clip should contain: catch/setup → loading dip → release
 
 ## Database Schema
 
 ```
-users
-  id, email, password_hash, full_name, created_at
-
-videos
-  id, user_id, filename, original_filename, file_path
-  original_duration, selected_start_time, selected_end_time
-  processed_duration, status, created_at
-
-analyses
-  id, video_id, score, shooting_arm, frames_analyzed
-  processing_time_seconds, error_message, created_at
-
-metrics
-  id, analysis_id, metric_name, metric_value
-  metric_unit, ideal_min, ideal_max
-
-recommendations
-  id, analysis_id, recommendation_text, metric_key, priority
+users         id, email, password_hash, full_name, created_at
+videos        id, user_id, filename, file_path, original_duration,
+              selected_start_time, selected_end_time, status, created_at
+analyses      id, video_id, score, shooting_arm, frames_analyzed,
+              processing_time_seconds, pose_image_path, error_message, created_at
+metrics       id, analysis_id, metric_name, metric_value, metric_unit,
+              ideal_min, ideal_max
+recommendations  id, analysis_id, recommendation_text, metric_key, priority
 ```
 
 ## Project Structure
@@ -201,70 +229,69 @@ basketball-shot-analyzer/
 │   ├── app/
 │   │   ├── api/           # FastAPI route handlers
 │   │   ├── core/          # Config, security, dependencies
-│   │   ├── cv/            # MediaPipe pose analysis
+│   │   ├── cv/            # MediaPipe pose analysis + recommendations
 │   │   ├── db/            # SQLAlchemy engine + session
 │   │   ├── models/        # ORM models
 │   │   ├── schemas/       # Pydantic DTOs
-│   │   ├── services/      # Business logic (analysis runner)
+│   │   ├── services/      # Analysis orchestration
 │   │   └── main.py
-│   ├── alembic/           # Database migrations
+│   ├── alembic/           # DB migrations
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
 │   │   ├── app/           # Next.js App Router pages
-│   │   ├── components/    # Shared UI components
-│   │   ├── features/      # Feature modules
-│   │   │   ├── dashboard/
-│   │   │   ├── upload/
-│   │   │   ├── analysis/
-│   │   │   └── history/
+│   │   ├── features/      # Feature modules (dashboard, upload, analysis, history)
 │   │   ├── lib/           # API client, utilities
 │   │   ├── store/         # Zustand auth store
 │   │   └── types/         # TypeScript interfaces
 │   ├── Dockerfile
 │   └── package.json
+├── preview_pose.py        # Local CV preview tool (Tasks API, click-to-select)
 └── docker-compose.yml
 ```
 
-## Metrics & Ideal Ranges
+## Local CV Preview Tool
 
-| Metric | Ideal Range | Unit |
-|---|---|---|
-| Release Angle | 45–55° | degrees |
-| Elbow Angle at Release | 85–100° | degrees |
-| Knee Bend at Setup | 90–120° | degrees |
-| Shoulder Alignment | 0–3 | deviation |
-| Shot Duration | 0.4–0.9 | seconds |
-| Jump Height Estimate | 0.03–0.12 | normalized |
-| Release Consistency | 75–100 | score |
+For inspecting pose detection without the full Docker stack:
+
+```bash
+python preview_pose.py test-videos/your-video.mp4
+```
+
+- Click on a person to select them (orange = selected, grey = others)
+- Shows wrist heights and dominant arm estimate per person
+- Space to pause, Q to quit, R to reset selection
+- Downloads `pose_landmarker_full.task` model on first run (~28 MB)
 
 ## Roadmap
 
-**Phase 1 (Current MVP)**
+**Phase 1 (Current)**
 - [x] JWT auth
-- [x] Video upload + in-browser trimming
+- [x] In-browser video trimming (FFmpeg.wasm)
 - [x] MediaPipe pose analysis
 - [x] 7 biomechanical metrics
-- [x] Score + recommendations
+- [x] 2-panel pose visualization (Loading + Release)
+- [x] 4-stage shooting arm detection with wrist snap
+- [x] Score + automated coaching feedback
 - [x] Progress dashboard
 
 **Phase 2**
 - [ ] Shot make/miss detection (ball tracking)
-- [ ] Multi-shot sequence analysis
+- [ ] Multi-shot session analysis (consistency across shots)
 - [ ] PDF report export
 - [ ] AWS S3 video storage
 
 **Phase 3**
-- [ ] Mobile-optimized PWA
+- [ ] Mobile PWA
 - [ ] Real-time analysis via WebRTC
-- [ ] Team/coach accounts
 - [ ] Comparison against NBA player baselines
+- [ ] Team/coach accounts
 
-## Notes for Production
+## Production Notes
 
 - Replace `SECRET_KEY` with a cryptographically random 32-byte string
-- Configure `CORS_ORIGINS` to your actual domain
-- Use AWS S3 or similar for video storage (swap `file_path` for S3 key in `Video` model)
-- Add rate limiting (e.g., `slowapi`) on upload endpoints
-- Run Alembic migrations instead of `create_all` in production
+- Set `CORS_ORIGINS` to your actual domain
+- Use S3/R2 for video storage (replace `file_path` with object key in `Video` model)
+- Add rate limiting on upload endpoints (`slowapi`)
+- Use Alembic migrations instead of `create_all`

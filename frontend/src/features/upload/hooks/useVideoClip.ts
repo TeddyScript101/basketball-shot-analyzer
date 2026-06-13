@@ -14,7 +14,7 @@ export interface ClipState {
   isValid: boolean;
 }
 
-const MAX_DURATION = 15;
+const MAX_DURATION = 3;
 
 export function useVideoClip() {
   const [clip, setClip] = useState<ClipState>({

@@ -81,7 +81,7 @@ async def upload_video(
     await db.commit()
     await db.refresh(video)
 
-    background_tasks.add_task(run_analysis, video.id, db)
+    background_tasks.add_task(run_analysis, video.id)
 
     return video
 

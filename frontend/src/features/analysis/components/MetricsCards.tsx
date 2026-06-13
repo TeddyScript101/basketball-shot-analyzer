@@ -46,14 +46,16 @@ export function MetricsCards({ metrics }: Props) {
                   : "text-foreground"
               )}
             >
-              {m.metric_value != null ? m.metric_value.toFixed(1) : "—"}
+              {m.metric_value != null
+                ? m.metric_value < 1 ? m.metric_value.toFixed(2) : m.metric_value.toFixed(1)
+                : "—"}
               <span className="text-sm font-normal text-muted-foreground ml-1">
                 {m.metric_unit}
               </span>
             </p>
             {m.ideal_min != null && m.ideal_max != null && (
               <p className="text-xs text-muted-foreground">
-                Ideal: {m.ideal_min}–{m.ideal_max} {m.metric_unit}
+                Ideal: {m.ideal_min != null && m.ideal_min < 1 ? m.ideal_min.toFixed(2) : m.ideal_min}–{m.ideal_max != null && m.ideal_max < 1 ? m.ideal_max.toFixed(2) : m.ideal_max} {m.metric_unit}
               </p>
             )}
           </div>

@@ -45,23 +45,14 @@ def generate_recommendations(metrics: ShootingMetrics) -> list[Recommendation]:
 
     if metrics.elbow_angle_at_release is not None:
         angle = metrics.elbow_angle_at_release
-        if angle < 80:
+        if angle < 140:
             recs.append(Recommendation(
                 text=(
-                    f"Shooting elbow is too bent at release ({angle:.0f}°). "
-                    "Straighten toward 85-100° for a clean follow-through and better power transfer."
+                    f"Arm not fully extending through the shot ({angle:.0f}° at release). "
+                    "Drive the elbow toward full extension (155-175°) for maximum power transfer."
                 ),
                 metric_key="elbow_angle",
                 priority=1,
-            ))
-        elif angle > 105:
-            recs.append(Recommendation(
-                text=(
-                    f"Elbow flare detected at {angle:.0f}°. "
-                    "Keep the elbow directly under the ball at 85-100° to maintain aim."
-                ),
-                metric_key="elbow_angle",
-                priority=2,
             ))
 
     if metrics.knee_angle_at_setup is not None:
@@ -75,11 +66,11 @@ def generate_recommendations(metrics: ShootingMetrics) -> list[Recommendation]:
                 metric_key="knee_angle",
                 priority=1,
             ))
-        elif angle < 85:
+        elif angle < 65:
             recs.append(Recommendation(
                 text=(
-                    f"Excessive knee bend ({angle:.0f}°) may cause balance issues. "
-                    "Aim for 90-120° for optimal power without compromising stability."
+                    f"Very deep knee bend ({angle:.0f}°) can compromise balance at release. "
+                    "Aim for 70-120° for power with stability."
                 ),
                 metric_key="knee_angle",
                 priority=2,

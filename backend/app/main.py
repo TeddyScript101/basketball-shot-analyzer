@@ -1,7 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -33,6 +33,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def corp_for_uploads(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/uploads/"):
+        response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+    return response
 
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR, check_dir=False), name="uploads")
 app.include_router(api_router, prefix="/api")

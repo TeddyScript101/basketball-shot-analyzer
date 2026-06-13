@@ -18,6 +18,21 @@ node_modules/
 postgres_data/
 uploads/
 
+# Test videos
+test-videos/
+
+# ML model files
+*.task
+
+# Build output
+frontend/out/
+
+# Stray pose images in root
+analysis_*_pose.jpg
+
+# Dev scripts
+preview_pose.py
+
 # OS
 .DS_Store
 Thumbs.db

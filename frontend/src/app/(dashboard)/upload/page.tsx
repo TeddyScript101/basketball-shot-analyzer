@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, CheckCircle, AlertCircle, Loader2, X } from "lucide-react";
 import { useVideoClip } from "@/features/upload/hooks/useVideoClip";
@@ -20,6 +20,13 @@ export default function UploadPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [createdVideoId, setCreatedVideoId] = useState<number | null>(null);
   const [analysisId, setAnalysisId] = useState<number | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
@@ -76,13 +83,14 @@ export default function UploadPage() {
       setStage("done");
 
       // Poll for analysis completion
-      const poll = setInterval(async () => {
+      pollRef.current = setInterval(async () => {
         try {
           const { analysisApi } = await import("@/lib/api");
           const analyses = await analysisApi.list();
           const found = analyses.find((a) => a.video_id === video.id);
           if (found) {
-            clearInterval(poll);
+            clearInterval(pollRef.current!);
+            pollRef.current = null;
             setAnalysisId(found.id);
           }
         } catch {}
@@ -136,27 +144,35 @@ export default function UploadPage() {
       <div>
         <h1 className="text-2xl font-bold">New Analysis</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Upload a shooting video and select up to 15 seconds for analysis
+          Upload a shooting video and select a 3-second clip (one shot)
         </p>
       </div>
 
       {stage === "idle" && (
-        <div
-          onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
-          className="border-2 border-dashed border-border hover:border-primary rounded-xl p-12 text-center cursor-pointer transition-colors group"
-          onClick={() => document.getElementById("file-input")?.click()}
-        >
-          <input
-            id="file-input"
-            type="file"
-            accept="video/mp4,video/quicktime,video/webm"
-            className="hidden"
-            onChange={handleFileInput}
-          />
-          <Upload className="w-12 h-12 text-muted-foreground group-hover:text-primary mx-auto mb-4 transition-colors" />
-          <p className="text-lg font-medium mb-1">Drop your video here</p>
-          <p className="text-sm text-muted-foreground">MP4, MOV, or WebM up to 500 MB</p>
+        <div className="space-y-3">
+          <div
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            className="border-2 border-dashed border-border hover:border-primary rounded-xl p-12 text-center cursor-pointer transition-colors group"
+            onClick={() => document.getElementById("file-input")?.click()}
+          >
+            <input
+              id="file-input"
+              type="file"
+              accept="video/mp4,video/quicktime,video/webm"
+              className="hidden"
+              onChange={handleFileInput}
+            />
+            <Upload className="w-12 h-12 text-muted-foreground group-hover:text-primary mx-auto mb-4 transition-colors" />
+            <p className="text-lg font-medium mb-1">Drop your video here</p>
+            <p className="text-sm text-muted-foreground">MP4, MOV, or WebM up to 500 MB</p>
+          </div>
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3 flex items-start gap-2.5">
+            <span className="text-amber-400 text-sm mt-0.5">💡</span>
+            <p className="text-xs text-amber-300/80 leading-relaxed">
+              <span className="font-semibold text-amber-300">Best results:</span> Film from a 45–90° side angle. Front-on shots hide elbow extension and knee depth, reducing analysis accuracy.
+            </p>
+          </div>
         </div>
       )}
 
@@ -180,6 +196,8 @@ export default function UploadPage() {
 
           <VideoPreviewPlayer
             src={clip.objectUrl}
+            startTime={clip.startTime}
+            endTime={clip.endTime}
             onDurationLoaded={handleDurationLoaded}
           />
 
@@ -188,7 +206,7 @@ export default function UploadPage() {
               <div>
                 <h3 className="font-semibold text-sm">Select Clip</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Choose up to 15 seconds containing the shooting motion
+                  Select one 3-second shot. Player loops the selected clip.
                 </p>
               </div>
               <ClipTimelineSelector

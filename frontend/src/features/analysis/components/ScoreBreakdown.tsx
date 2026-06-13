@@ -46,7 +46,7 @@ export function ScoreBreakdown({ score, shootingArm, framesAnalyzed, processingT
           <div>
             <span className={cn("text-4xl font-bold", color)}>{grade}</span>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {score >= 80 ? "Excellent form" : score >= 60 ? "Good with room to improve" : "Focus on fundamentals"}
+              {score >= 88 ? "Excellent form" : score >= 75 ? "Good with room to improve" : score >= 60 ? "Focus on fundamentals" : "Significant improvements needed"}
             </p>
           </div>
           <div className="space-y-1 text-sm text-muted-foreground">

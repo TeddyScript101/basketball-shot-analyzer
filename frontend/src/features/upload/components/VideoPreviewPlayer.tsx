@@ -1,20 +1,24 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { Play, Pause, RotateCcw } from "lucide-react";
+import { Play, Pause } from "lucide-react";
 import { formatDuration } from "@/lib/utils";
 
 interface Props {
   src: string;
-  currentTime?: number;
+  startTime?: number;
+  endTime?: number;
   onDurationLoaded: (duration: number) => void;
 }
 
-export function VideoPreviewPlayer({ src, currentTime, onDurationLoaded }: Props) {
+export function VideoPreviewPlayer({ src, startTime = 0, endTime = 0, onDurationLoaded }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [clipProgress, setClipProgress] = useState(0);
   const [displayTime, setDisplayTime] = useState(0);
+
+  const clipActive = endTime > startTime && endTime > 0;
+  const clipDuration = clipActive ? endTime - startTime : 0;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -24,10 +28,23 @@ export function VideoPreviewPlayer({ src, currentTime, onDurationLoaded }: Props
       onDurationLoaded(video.duration);
       setDisplayTime(0);
     };
+
     const handleTimeUpdate = () => {
-      setDisplayTime(video.currentTime);
-      setProgress((video.currentTime / video.duration) * 100);
+      const ct = video.currentTime;
+
+      if (clipActive && ct >= endTime) {
+        video.currentTime = startTime;
+        return;
+      }
+
+      setDisplayTime(ct);
+      if (clipActive) {
+        setClipProgress(Math.max(0, Math.min(100, ((ct - startTime) / clipDuration) * 100)));
+      } else if (isFinite(video.duration) && video.duration > 0) {
+        setClipProgress((ct / video.duration) * 100);
+      }
     };
+
     const handleEnded = () => setIsPlaying(false);
 
     video.addEventListener("loadedmetadata", handleLoaded);
@@ -38,13 +55,18 @@ export function VideoPreviewPlayer({ src, currentTime, onDurationLoaded }: Props
       video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("ended", handleEnded);
     };
-  }, [onDurationLoaded]);
+  }, [onDurationLoaded, startTime, endTime, clipActive, clipDuration]);
 
+  // Seek to startTime when clip boundaries change, but only if outside range
   useEffect(() => {
-    if (currentTime !== undefined && videoRef.current) {
-      videoRef.current.currentTime = currentTime;
+    const video = videoRef.current;
+    if (!video || !isFinite(video.duration) || video.duration === 0) return;
+    if (!clipActive) return;
+    const ct = video.currentTime;
+    if (ct < startTime || ct >= endTime) {
+      video.currentTime = startTime;
     }
-  }, [currentTime]);
+  }, [startTime, endTime, clipActive]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -53,6 +75,12 @@ export function VideoPreviewPlayer({ src, currentTime, onDurationLoaded }: Props
       video.pause();
       setIsPlaying(false);
     } else {
+      if (clipActive) {
+        const ct = video.currentTime;
+        if (ct < startTime || ct >= endTime) {
+          video.currentTime = startTime;
+        }
+      }
       video.play().catch((err) => {
         if (err.name !== "AbortError") console.error(err);
         setIsPlaying(false);
@@ -66,7 +94,11 @@ export function VideoPreviewPlayer({ src, currentTime, onDurationLoaded }: Props
     if (!video || !isFinite(video.duration) || video.duration === 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
-    video.currentTime = Math.max(0, Math.min(video.duration, pct * video.duration));
+    if (clipActive) {
+      video.currentTime = startTime + pct * clipDuration;
+    } else {
+      video.currentTime = pct * video.duration;
+    }
   };
 
   return (
@@ -85,7 +117,7 @@ export function VideoPreviewPlayer({ src, currentTime, onDurationLoaded }: Props
         >
           <div
             className="h-full bg-primary rounded-full transition-all"
-            style={{ width: `${progress}%` }}
+            style={{ width: `${clipProgress}%` }}
           />
         </div>
         <div className="flex items-center gap-3">
@@ -100,8 +132,15 @@ export function VideoPreviewPlayer({ src, currentTime, onDurationLoaded }: Props
             )}
           </button>
           <span className="text-xs text-muted-foreground font-mono">
-            {formatDuration(displayTime)}
+            {clipActive
+              ? `${formatDuration(Math.max(0, displayTime - startTime))} / ${formatDuration(clipDuration)}`
+              : formatDuration(displayTime)}
           </span>
+          {clipActive && (
+            <span className="text-xs text-primary/60 font-mono ml-auto">
+              {formatDuration(startTime)} – {formatDuration(endTime)}
+            </span>
+          )}
         </div>
       </div>
     </div>

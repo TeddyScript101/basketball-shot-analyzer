@@ -24,9 +24,8 @@ export function scoreToColor(score: number): string {
 }
 
 export function scoreToGrade(score: number): string {
-  if (score >= 90) return "A+";
-  if (score >= 80) return "A";
-  if (score >= 70) return "B";
+  if (score >= 88) return "A";
+  if (score >= 75) return "B";
   if (score >= 60) return "C";
   return "D";
 }
